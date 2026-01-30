@@ -1,0 +1,295 @@
+
+<div class="relative w-full h-screen bg-gray-200 overflow-hidden font-sans select-none text-slate-800">
+  
+  <!-- BACKGROUND MAP (Full Screen) -->
+  <div class="absolute inset-0 z-0 active:opacity-95 transition-opacity" (click)="closePanel()">
+    <app-map-visualizer 
+      [orders]="orders()" 
+      [selectedOrderId]="selectedOrder()?.id ?? null"
+      [isNavigating]="isNavigating()"
+      [driverPosition]="driverPosition()">
+    </app-map-visualizer>
+  </div>
+
+  <!-- === NAVIGATION OVERLAY MODE === -->
+  @if (isNavigating() && selectedOrder(); as activeOrder) {
+    <!-- Nav Header -->
+    <div class="absolute top-4 left-4 right-4 z-30 animate-in slide-in-from-top-4 duration-500">
+      <div class="bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex items-center gap-4">
+        <div class="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0">
+           <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+        </div>
+        <div>
+          <div class="text-emerald-400 font-bold uppercase text-xs tracking-wider mb-0.5">Próxima Ação</div>
+          <div class="text-xl font-bold leading-tight">Siga para {{ activeOrder.dropoff.label }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav Footer -->
+    <div class="absolute bottom-6 left-4 right-4 z-30 animate-in slide-in-from-bottom-4 duration-500">
+      <div class="bg-white p-4 rounded-3xl shadow-2xl border border-gray-200">
+        <div class="flex justify-between items-center mb-4 px-2">
+           <div class="text-center">
+             <div class="text-2xl font-black text-slate-900">{{ navDistanceRemaining() | number:'1.1-1' }}</div>
+             <div class="text-[10px] text-slate-500 font-bold uppercase">Km Restantes</div>
+           </div>
+           <div class="h-8 w-px bg-gray-200"></div>
+           <div class="text-center">
+             <div class="text-2xl font-black text-slate-900">{{ (navDistanceRemaining() * 2) | number:'1.0-0' }}</div>
+             <div class="text-[10px] text-slate-500 font-bold uppercase">Min Estimados</div>
+           </div>
+           <div class="h-8 w-px bg-gray-200"></div>
+           <div class="text-center">
+             <div class="text-2xl font-black text-emerald-600">R$ {{ activeOrder.price | number:'1.0-0' }}</div>
+             <div class="text-[10px] text-slate-500 font-bold uppercase">Ganho</div>
+           </div>
+        </div>
+        
+        <button (click)="stopNavigation()" class="w-full py-4 bg-red-100 text-red-700 font-bold rounded-xl hover:bg-red-200 transition-colors">
+          Cancelar Corrida
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- === STANDARD UI (Hidden when navigating) === -->
+  @if (!isNavigating()) {
+    
+    <!-- TOP BAR (Status & Brand) -->
+    <div class="absolute top-0 left-0 w-full z-10 pt-4 px-4 pointer-events-none transition-all duration-500 transform"
+        [class.-translate-y-full]="isPanelExpanded()"
+        [class.opacity-0]="isPanelExpanded()">
+      
+      <div class="flex justify-between items-start max-w-5xl mx-auto">
+        <!-- Brand Pill -->
+        <div class="pointer-events-auto flex items-center gap-3 bg-white/80 backdrop-blur-xl px-4 py-2.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/40">
+          <div class="w-8 h-8 bg-black rounded-xl flex items-center justify-center text-white shadow-lg">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+          <div>
+            <h1 class="font-bold text-sm leading-none text-slate-900">Q-Moto</h1>
+            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Driver AI</span>
+          </div>
+        </div>
+
+        <!-- Live Earnings Pill -->
+        <div class="pointer-events-auto bg-white/80 backdrop-blur-xl px-5 py-2 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/40 flex flex-col items-end">
+          <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Potencial</span>
+          <span class="text-base font-extrabold text-emerald-600">R$ {{ totalPotentialProfit() | number:'1.2-2' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM SHEET / PANEL -->
+    <div class="absolute bottom-0 left-0 w-full z-20 flex justify-center md:justify-start md:items-center md:h-full md:pointer-events-none md:p-6">
+      
+      <div 
+        class="bg-white/95 backdrop-blur-xl w-full md:w-[420px] rounded-t-[2.5rem] md:rounded-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col pointer-events-auto border-t md:border border-white/50 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] transform will-change-transform md:h-[90vh]"
+        [class.h-[45vh]]="!isPanelExpanded()"
+        [class.h-[95vh]]="isPanelExpanded()"
+      >
+        
+        <!-- Mobile Drag Handle -->
+        <div class="w-full flex justify-center pt-4 pb-1 md:hidden cursor-pointer touch-pan-y" (click)="togglePanel()">
+          <div class="w-16 h-1.5 bg-gray-200 rounded-full"></div>
+        </div>
+
+        <!-- CONTENT SWITCHER -->
+        @if (selectedOrder(); as selected) {
+          
+          <!-- === DETAIL VIEW (Active Mission) === -->
+          <div class="flex flex-col h-full animate-in fade-in slide-in-from-bottom-8 duration-500">
+            
+            <!-- Header -->
+            <div class="px-6 pt-2 pb-4 border-b border-gray-100/50 flex items-center gap-4 flex-shrink-0">
+              <button (click)="clearSelection()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Pedido #{{ selected.id.split('-')[1] }}</span>
+                  @if (selected.profitabilityScore && selected.profitabilityScore > 80) {
+                      <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        Alta Demanda
+                      </span>
+                  }
+                </div>
+                <h2 class="text-lg font-bold text-slate-900 truncate mt-1">{{ selected.restaurant }}</h2>
+              </div>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              <!-- Price Hero -->
+              <div class="text-center py-4">
+                  <div class="text-sm text-slate-500 font-medium mb-1">Valor Total</div>
+                  <div class="text-5xl font-black text-slate-900 tracking-tight">R$ {{ selected.price | number:'1.2-2' }}</div>
+              </div>
+
+              <!-- Grid Stats -->
+              <div class="grid grid-cols-3 gap-3">
+                  <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                    <div class="text-slate-400 mb-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg></div>
+                    <div class="font-bold text-slate-900 text-lg">{{ selected.distanceKm }}</div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Km</div>
+                  </div>
+                  <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                    <div class="text-slate-400 mb-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                    <div class="font-bold text-slate-900 text-lg">{{ selected.estimatedTimeMin }}</div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Min</div>
+                  </div>
+                  <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    @if(selected.trafficLevel === 'Low') {
+                        <div class="absolute inset-0 bg-emerald-50 opacity-50"></div>
+                        <div class="relative text-emerald-500 mb-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <div class="relative font-bold text-emerald-700 text-lg">Livre</div>
+                    } @else if (selected.trafficLevel === 'Medium') {
+                        <div class="absolute inset-0 bg-yellow-50 opacity-50"></div>
+                        <div class="relative text-yellow-500 mb-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
+                        <div class="relative font-bold text-yellow-700 text-lg">Médio</div>
+                    } @else {
+                        <div class="absolute inset-0 bg-red-50 opacity-50"></div>
+                        <div class="relative text-red-500 mb-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
+                        <div class="relative font-bold text-red-700 text-lg">Intenso</div>
+                    }
+                    <div class="relative text-[10px] font-bold text-slate-400 uppercase">Tráfego</div>
+                  </div>
+              </div>
+
+              <!-- Timeline -->
+              <div class="relative pl-2 pt-2">
+                  <div class="absolute left-[19px] top-4 bottom-4 w-0.5 bg-gray-200"></div>
+                  
+                  <div class="relative flex gap-4 mb-8 group">
+                    <div class="w-10 h-10 rounded-full bg-white border-2 border-slate-900 flex items-center justify-center shrink-0 z-10 shadow-sm group-hover:scale-110 transition-transform">
+                        <div class="w-3 h-3 bg-slate-900 rounded-sm"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Retirar em</div>
+                        <div class="text-base font-bold text-slate-900">{{ selected.restaurant }}</div>
+                        <div class="text-sm text-slate-500">{{ selected.pickup.label }}</div>
+                    </div>
+                  </div>
+
+                  <div class="relative flex gap-4 group">
+                    <div class="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center shrink-0 z-10 shadow-lg group-hover:scale-110 transition-transform">
+                        <div class="w-3 h-3 border-2 border-white rounded-full"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Entregar para</div>
+                        <div class="text-base font-bold text-slate-900">{{ selected.customer }}</div>
+                        <div class="text-sm text-slate-500">{{ selected.dropoff.label }}</div>
+                    </div>
+                  </div>
+              </div>
+
+            </div>
+
+            <!-- Footer Action -->
+            <div class="p-6 pt-2 pb-8 md:pb-6 bg-gradient-to-t from-white via-white to-transparent flex-shrink-0">
+              <button (click)="startNavigation()" class="w-full bg-slate-900 text-white font-bold text-lg py-4 rounded-2xl shadow-xl shadow-slate-300 hover:bg-slate-800 hover:scale-[1.02] active:scale-95 transition-all flex justify-center items-center gap-3">
+                  <span>Aceitar Corrida</span>
+                  <svg class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+              </button>
+            </div>
+          </div>
+
+        } @else {
+          
+          <!-- === LIST VIEW === -->
+          <div class="flex flex-col h-full">
+              
+              <!-- Dashboard Header -->
+              <div class="px-6 pt-4 pb-4 flex-shrink-0">
+                <div class="flex justify-between items-end mb-4">
+                  <div>
+                      <h2 class="text-2xl font-black text-slate-900 tracking-tight">Oportunidades</h2>
+                      <p class="text-sm text-slate-500 font-medium mt-1">
+                        {{ orders().length }} entregas na região
+                      </p>
+                  </div>
+                  
+                  <div class="flex gap-2">
+                      <button 
+                        (click)="refreshOrders(); $event.stopPropagation()"
+                        class="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      </button>
+                  </div>
+                </div>
+
+                <!-- Optimize Button -->
+                <button 
+                    (click)="optimizeRoutes(); $event.stopPropagation()"
+                    [disabled]="isOptimizing()"
+                    class="w-full h-14 rounded-2xl font-bold text-base shadow-lg shadow-blue-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+                    [class.bg-blue-600]="!isOptimizing()"
+                    [class.text-white]="!isOptimizing()"
+                    [class.bg-slate-100]="isOptimizing()"
+                    [class.text-slate-400]="isOptimizing()"
+                  >
+                    @if (isOptimizing()) {
+                      <div class="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Analisando Rotas...</span>
+                    } @else {
+                      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      <span>Otimizar com IA</span>
+                    }
+                </button>
+              </div>
+
+              <!-- List -->
+              <div class="flex-1 overflow-y-auto px-6 pb-24 md:pb-8 space-y-4">
+                
+                @for (order of orders(); track order.id) {
+                  <div 
+                    (click)="selectOrder(order)"
+                    class="group relative bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer active:scale-[0.98]"
+                  >
+                    
+                    <!-- Profitability Badge (Top Right) -->
+                    @if (order.profitabilityScore) {
+                      <div class="absolute top-4 right-4">
+                          <div class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold"
+                              [class]="order.profitabilityScore > 80 ? 'bg-emerald-100 text-emerald-700' : (order.profitabilityScore > 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700')">
+                            @if(order.profitabilityScore > 80) { <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg> }
+                            SCORE {{ order.profitabilityScore }}
+                          </div>
+                      </div>
+                    }
+
+                    <div class="pr-20">
+                      <h3 class="font-bold text-slate-900 text-base truncate">{{ order.restaurant }}</h3>
+                      <div class="text-xs text-slate-500 truncate mt-0.5">{{ order.pickup.label }} &rarr; {{ order.dropoff.label }}</div>
+                    </div>
+
+                    <div class="mt-4 flex items-end justify-between">
+                      <!-- Mini Stats -->
+                      <div class="flex gap-3 text-xs font-medium text-slate-500">
+                          <span class="flex items-center gap-1 bg-slate-50 px-1.5 py-1 rounded">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            {{ order.estimatedTimeMin }} min
+                          </span>
+                          <span class="flex items-center gap-1 bg-slate-50 px-1.5 py-1 rounded">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            {{ order.distanceKm }} km
+                          </span>
+                      </div>
+                      
+                      <!-- Price -->
+                      <div class="text-lg font-black text-slate-900">R$ {{ order.price | number:'1.2-2' }}</div>
+                    </div>
+
+                  </div>
+                }
+              </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+</div>

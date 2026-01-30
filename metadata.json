@@ -1,0 +1,7 @@
+{
+  "name": "Q-Moto Delivery",
+  "description": "Aplicativo de otimização de rotas para entregadores usando simulação de algoritmos quânticos (inspirado em Wokong/Qpanda) e IA para maximizar lucros.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
